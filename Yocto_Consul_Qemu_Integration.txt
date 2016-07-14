@@ -1,0 +1,1103 @@
+Openembedded Yocto Linux and Consul Integration using Qemu
+						
+
+Author : J Ghosh
+Dated   : June, 2016
+Revision : 1.0
+Conatct Informations :
+Email:	jg.info9@gmail.com
+
+Contents
+
+Openembedded Yocto Linux and Consul Integration using Qemu	1
+Problem 1:	2
+Solution of Problem1:	2
+1.1 Consul DB:	2
+1.2 Yocto Project:	2
+1.3 Steps involved in Problem 1:	2
+1.3.3 Possible Solutions:	4
+1.3.5.1 Using devtool to generate recipe for Consul i386 binary from poky workspace:	4
+1.3.5.2 Verified the devtool generated Consul recipe contents: consul064386binv1_0.6.4.bb :	4
+1.3.5.3 Build new Recipe or rebuild the existing qemux86 default Image	5
+1.3.5.4 Turn on the existing default image qemux86	6
+1.3.5.5 Deployed newly build consul064386binv1 recipe into directly to the running target qemux86 emulation	7
+1.3.5.6 Data Integrity with new consul recipe contents:	9
+1.3.5.6.2 consul binary:	10
+1.3.5.6.3 consul new recipe contents:	10
+1.3.5.6.4 Default workspace layer contents:	11
+Problem 2:	11
+Solution of Problem 2:	11
+2.1 Yocto BSP SDK tools can be leveraged for qemu:	11
+2.2 Source the environment in order to create or build a BSP:	11
+2.3 Calling new target machine ' jgqemux86v1' and will invoke 'yocto-bsp create'	12
+2.4 Add the new Consul BSP layer to BBLAYERS	13
+2.5 Inline modified layer configuration: conf/local.conf :	14
+2.5 Using meta/recipes-sato/images/core-image-sato.bb for new image building:	18
+2.6 Building the new image jgqemux86v1 with recipe consul064386binv1:	18
+2.7 Verified the newly build kernel and rootfs image:	22
+2.8 Tree structure post new image build completion before deployment:	23
+2.9 Running the new image jgqemux86v1 with new kernel and rootfs:	24
+2.10 Verified the source  consul-i386 source binary and destination target:	26
+
+
+
+
+
+Development project using Yocto
+
+Yocto as a possible openembedded platform for open source embedded products in the future. Yocto is a set of tools and processes to create custom Linux distributions for embedded products independent from the underlying hardware architecture with minimal efforts in integration in cross vendor integration. Yocto solves this problem using recipe, which provides information about packages, dependencies, where the source code resides, how to build the package and more.
+
+
+
+
+
+Problem 1: 
+
+Consul is a distributed key/value store for distributed NoSQL database. Unfortunately there is no recipe for Consul to date in Yocto distribution. We would like you to write a Yocto recipe for Consul to understand the porting efforts required for any unknown third-party vendor when source code repository and direct binary integration effort involved.
+
+
+Solution of Problem1:
+
+
+1.1 Consul DB:
+It is a HashiCorp product hosted by www.consul.io and maintained with Golang. Consul is publicly available in multiple varients:
+
+1.1.1 Latest and stable Binary Release: 0.6.4 release: Direct target platform binary under https://www.consul.io/downloads.html for several common architectures.
+
+1.1.2 Open source Git Repository: 0.6.2 and master branch release : [no 0.6.4 git tag found] https://github.com/hashicorp/consul.
+
+1.1.3 Consul Support tools under https://www.consul.io/downloads_tools.html and https://releases.hashicorp.com/consul/0.6.4/consul_0.6.4_web_ui.zip.
+
+
+1.2 Yocto Project:
+It is a joint collaboration effort by openembedded, Linux Foundation and many other partners to joinly develop hardware architecture independent embedded Linux solutions with generic templates, tools, solutions and it supports extensible SDKs.
+
+
+
+
+
+
+
+
+1.3 Steps involved in Problem 1:
+
+1.3.1 We referred Setting Up to Use the Yocto Project reference to configure our hosting platform.
+
+1.3.2 To setup yocto latest poky 2.1 revision, we used Ubuntu 14.04 LTS x64 as Host platform and setup poky latest git://git.yoctoproject.org/poky under krogoth2.1 branch.
+
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Tue May 17 13:21:25]
+$ cat .git/config 
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = git://git.yoctoproject.org/poky
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "krogoth"]
+	remote = origin
+	merge = refs/heads/krogoth
+
+
+
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Mon May 16 19:23:56]
+$ ll
+total 96
+drwxrwxr-x  3 sam1 sam1  4096 May 14 21:21 ..
+-rw-rw-r--  1 sam1 sam1    65 May 14 21:36 .templateconf
+-rw-rw-r--  1 sam1 sam1 19154 May 14 21:36 README.hardware
+-rw-rw-r--  1 sam1 sam1  2467 May 14 21:36 README
+-rw-rw-r--  8 sam1 sam1   515 May 14 21:36 LICENSE
+-rw-rw-r--  1 sam1 sam1   480 May 14 21:36 .gitignore
+drwxrwxr-x  6 sam1 sam1  4096 May 14 21:36 bitbake
+drwxrwxr-x 14 sam1 sam1  4096 May 14 21:36 documentation
+drwxrwxr-x  7 sam1 sam1  4096 May 14 21:36 meta-selftest
+drwxrwxr-x  5 sam1 sam1  4096 May 14 21:36 meta-poky
+drwxrwxr-x  8 sam1 sam1  4096 May 14 21:36 meta-yocto-bsp
+drwxrwxr-x  3 sam1 sam1  4096 May 14 21:36 meta-yocto
+drwxrwxr-x  7 sam1 sam1  4096 May 14 21:36 meta-skeleton
+-rwxrwxr-x  1 sam1 sam1  2559 May 14 21:36 oe-init-build-env-memres
+-rwxrwxr-x  1 sam1 sam1  2121 May 14 21:36 oe-init-build-env
+drwxrwxr-x 20 sam1 sam1  4096 May 14 21:36 meta
+drwxrwxr-x  8 sam1 sam1  4096 May 14 21:36 scripts
+drwxrwxr-x 13 sam1 sam1  4096 May 14 21:51 .
+drwxrwxr-x  8 sam1 sam1  4096 May 15 02:01 .git
+drwxrwxr-x  8 sam1 sam1  4096 May 16 16:03 ignorecase
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Mon May 16 19:23:58]
+$ source oe-init-build-env
+
+### Shell environment set up for builds. ###
+
+You can now run 'bitbake <target>'
+
+Common targets are:
+    core-image-minimal
+    core-image-sato
+    meta-toolchain
+    meta-ide-support
+
+You can also run generated qemu images with a command like 'runqemu qemux86'
+
+
+
+
+1.3.3 Possible Solutions: 
+
+Post analyzing the Yocto reference documents, we came up with the following approches to solve the Porting effort of Consol into Yocto.
+
+1.3.3.1 devtool to generate recipe for Consul with new Source/target Binary.
+
+1.3.3.2 recipetool to automated creation of Consul new base recipe.
+
+1.3.3.3 bitbake tool to writing a new Consul recipe from scratch.
+
+
+Selecting option 1.3.3.1 devtool out of others, owing to time limitation in delivery deadline, later we may evaluate and benchmark recipetool  and bitbake tool solutions.
+
+
+1.3.4 Between new Development Build of Consul using Golang on Host platform and reusing existing Consul 0.6.4 public binary, we found reusing existing target platform binary is optimised with respect to time and effort required for this quick delivery, hence we selected to reuse existing latest and stable 0.6.4 Consul Linux 32bit i386 [https://releases.hashicorp.com/consul/0.6.4/consul_0.6.4_linux_386.zip] binary form Consul official site.
+
+1.3.5 Based on the above selections, we run the following commands:
+
+1.3.5.1 Using devtool to generate recipe for Consul i386 binary from poky workspace:
+
+$ devtool add consul064386binv1 --no-git --binary --version 0.6.4 https://releases.hashicorp.com/consul/0.6.4/consul_0.6.4_linux_386.zip
+NOTE: Using default source tree path /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/sources/consul064386binv1
+NOTE: Using source tree as build directory since that would be the default for this recipe
+NOTE: Recipe /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb has been automatically created; further editing may be required to make it fully functional
+
+
+1.3.5.2 Verified the devtool generated Consul recipe contents: consul064386binv1_0.6.4.bb :
+
+$cat ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb
+# Recipe created by recipetool
+# This is the basis of a recipe and may need further editing in order to be fully functional.
+# (Feel free to remove these comments when editing.)
+#
+# Unable to find any files that looked like license statements. Check the accompanying
+# documentation and source headers and set LICENSE and LIC_FILES_CHKSUM accordingly.
+#
+# NOTE: LICENSE is being set to "CLOSED" to allow you to at least start building - if
+# this is not accurate with respect to the licensing of the software being built (it
+# will not be in most cases) you must specify the correct value before using this
+# recipe for anything other than initial testing/development!
+LICENSE = "CLOSED"
+LIC_FILES_CHKSUM = ""
+
+SRC_URI = "https://releases.hashicorp.com/consul/${PV}/consul_${PV}_linux_386.zip;subdir=consul_${PV}_linux_386"
+SRC_URI[md5sum] = "03e9e878fd33d0d365b23fa5342b626c"
+SRC_URI[sha256sum] = "dbaf5ad1c95aa7dce1625d61b6686d3775e53cb3e7d6c426d29ea96622d248a8"
+
+S = "${WORKDIR}/consul_${PV}_linux_386"
+
+inherit bin_package
+
+INSANE_SKIP_${PN} += "already-stripped"
+
+1.3.5.3 Build new Recipe or rebuild the existing qemux86 default Image
+
+Using devtool, we build new Recipe consul064386binv1 :
+
+$ devtool build consul064386binv1
+WARNING: /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consulp3srcv1.1/consulp3srcv1.1_git.bb: consulp3srcv1.1: LICENSE value "Unknown MIT" has an invalid format - license names must be separated by the following characters to indicate the license selection: &|() 
+Parsing recipes: 100% |################################################################################################################################| Time: 00:00:41
+Parsing of 873 .bb files complete (0 cached, 873 parsed). 1303 targets, 47 skipped, 0 masked, 0 errors.
+NOTE: Resolving any missing task queue dependencies
+
+Build Configuration:
+BB_VERSION        = "1.30.0"
+BUILD_SYS         = "x86_64-linux"
+NATIVELSBSTRING   = "universal"
+TARGET_SYS        = "i586-poky-linux"
+MACHINE           = "qemux86"
+DISTRO            = "poky"
+DISTRO_VERSION    = "2.1"
+TUNE_FEATURES     = "m32 i586"
+TARGET_FPU        = ""
+meta              
+meta-poky         
+meta-yocto-bsp    
+workspace         = "krogoth:75ca53211488a3e268037a44ee2a7ac5c7181bd2"
+
+NOTE: Preparing RunQueue
+NOTE: Executing SetScene Tasks
+NOTE: Executing RunQueue Tasks
+NOTE: Tasks Summary: Attempted 333 tasks of which 327 didn't need to be rerun and all succeeded.
+
+Summary: There was 1 WARNING message shown.
+
+
+
+1.3.5.4 Turn on the existing default image qemux86 
+
+It was build earlier using bitbake core-image-sato from poky git source. Screenshot added when qemux86 running live from default pocky 2.1 image.
+
+$ runqemu qemux86
+
+Continuing with the following parameters:
+KERNEL: [/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/qemux86/bzImage-qemux86.bin]
+ROOTFS: [/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/qemux86/core-image-sato-qemux86-20160514163233.rootfs.ext4]
+FSTYPE: [ext4]
+Setting up tap interface under sudo
+Acquiring lockfile for tap0...
+Running qemu-system-i386...
+/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/sysroots/x86_64-linux/usr/bin/qemu-system-i386 -kernel /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/qemux86/bzImage-qemux86.bin -net nic,model=virtio -net tap,vlan=0,ifname=tap0,script=no,downscript=no -cpu qemu32 -drive file=/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/qemux86/core-image-sato-qemux86-20160514163233.rootfs.ext4,if=virtio,format=raw -show-cursor -usb -usbdevice tablet -vga vmware -no-reboot -m 256 -serial mon:vc -serial null -append "vga=0 uvesafb.mode_option=640x480-32 root=/dev/vda rw mem=256M ip=192.168.7.2::192.168.7.1:255.255.255.0 oprofile.timer=1 rootfstype=ext4 "
+
+
+
+
+
+
+
+
+
+
+
+
+1.3.5.5 Deployed newly build consul064386binv1 recipe into directly to the running target qemux86 emulation
+
+Qemu was running as guest with root@192.168.7.2 by using the devtool deploy-target command as screenshots inline. Once consul064386binv1 recipe deployed correctly on the running target, then we can see consul binary is newly deployed target under / partition. Then we granted necessary permissions to the consul binary and then consul started running it as detailed screenshots inline:
+
+$ devtool deploy-target consul064386binv1 root@192.168.7.2
+Parsing recipes..WARNING: consulp3srcv1.1: LICENSE value "Unknown MIT" has an invalid format - license names must be separated by the following characters to indicate the license selection: &|() 
+done.
+The authenticity of host '192.168.7.2 (192.168.7.2)' can't be established.
+RSA key fingerprint is b4:f3:33:1c:a8:e6:26:36:43:0d:1c:8f:87:29:36:81.
+Are you sure you want to continue connecting (yes/no)? yes
+NOTE: Successfully deployed /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/image
+
+Consul newly loaded into qemux86 target :
+
+
+
+
+Verified Consul binary i386 image into the target by running it as agent mode into the deployements as inline :
+
+
+
+
+
+
+
+
+
+Reference full screenshot while running consul inside qemux86 default target root@192.168.7.2 in Development Host(aka sam1@sam1) Ubuntu LTS 14.04 x64:
+
+
+
+
+
+
+1.3.5.6 Data Integrity with new consul recipe contents: 
+
+1.3.5.6.1 Workspace tree structure:
+
+$ tree conf workspace/conf workspace/appends workspace/recipes/consul064386binv1 workspace/sources/consul064386binv1
+conf
+|-- bblayers.conf
+|-- local.conf
+|-- templateconf.cfg
+`-- unlocked-sigs.inc
+workspace/conf
+`-- layer.conf
+workspace/appends
+|-- consul064386binv1_0.6.4.bbappend
+`-- consulp3srcv1.1_git.bbappend
+workspace/recipes/consul064386binv1
+`-- consul064386binv1_0.6.4.bb
+workspace/sources/consul064386binv1
+`-- consul
+
+0 directories, 9 files
+
+
+
+
+
+
+
+1.3.5.6.2 consul binary:
+
+$ ls -alrt workspace/sources/consul064386binv1/consul
+-rwxr-xr-x 1 sam1 sam1 18968832 Mar 16 22:21 workspace/sources/consul064386binv1/consul
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Mon May 16 21:53:56]
+
+$ workspace/sources/consul064386binv1/consul --version
+Consul v0.6.4
+Consul Protocol: 3 (Understands back to: 1)
+
+
+1.3.5.6.3 consul new recipe contents:
+
+consul064386binv1_0.6.4.bb:
+
+$ cat workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb
+# Recipe created by recipetool
+# This is the basis of a recipe and may need further editing in order to be fully functional.
+# (Feel free to remove these comments when editing.)
+#
+# Unable to find any files that looked like license statements. Check the accompanying
+# documentation and source headers and set LICENSE and LIC_FILES_CHKSUM accordingly.
+#
+# NOTE: LICENSE is being set to "CLOSED" to allow you to at least start building - if
+# this is not accurate with respect to the licensing of the software being built (it
+# will not be in most cases) you must specify the correct value before using this
+# recipe for anything other than initial testing/development!
+LICENSE = "CLOSED"
+LIC_FILES_CHKSUM = ""
+
+SRC_URI = "https://releases.hashicorp.com/consul/${PV}/consul_${PV}_linux_386.zip;subdir=consul_${PV}_linux_386"
+SRC_URI[md5sum] = "03e9e878fd33d0d365b23fa5342b626c"
+SRC_URI[sha256sum] = "dbaf5ad1c95aa7dce1625d61b6686d3775e53cb3e7d6c426d29ea96622d248a8"
+
+S = "${WORKDIR}/consul_${PV}_linux_386"
+
+inherit bin_package
+
+INSANE_SKIP_${PN} += "already-stripped"
+
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  4:40:02]
+
+
+consul064386binv1_0.6.4.bbappend:
+
+$ cat workspace/appends/consul064386binv1_0.6.4.bbappend 
+inherit externalsrc
+EXTERNALSRC = "/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/sources/consul064386binv1"
+EXTERNALSRC_BUILD = "/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/sources/consul064386binv1"
+do_install_append() {
+    rm -rf ${D}/.git
+    rm -f ${D}/singletask.lock
+}
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  4:40:32]
+
+
+1.3.5.6.4 Default workspace layer contents:
+
+$ cat workspace/conf/layer.conf 
+# ### workspace layer auto-generated by devtool ###
+BBPATH =. "${LAYERDIR}:"
+BBFILES += "${LAYERDIR}/recipes/*/*.bb \
+            ${LAYERDIR}/appends/*.bbappend"
+BBFILE_COLLECTIONS += "workspacelayer"
+BBFILE_PATTERN_workspacelayer = "^${LAYERDIR}/"
+BBFILE_PATTERN_IGNORE_EMPTY_workspacelayer = "1"
+BBFILE_PRIORITY_workspacelayer = "99"
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  4:40:47]
+
+
+
+
+
+
+
+
+Problem 2: 
+
+How to create or extend any Yocto configuration for QEMU.
+
+
+Solution of Problem 2:
+
+2.1 Yocto BSP SDK tools can be leveraged for qemu: 
+
+We choose qemux86 for better library compatible BSP as jgqemux86v1 configuration as inline:
+
+
+2.2 Source the environment in order to create or build a BSP:
+
+$ source oe-init-build-env
+You had no conf/local.conf file. This configuration file has therefore been
+created for you with some default values. You may wish to edit it to, for
+example, select a different MACHINE (target hardware). See conf/local.conf
+for more information as common configuration options are commented.
+
+You had no conf/bblayers.conf file. This configuration file has therefore been
+created for you with some default values. To add additional metadata layers
+into your configuration please add entries to conf/bblayers.conf.
+
+The Yocto Project has extensive documentation about OE including a reference
+manual which can be found at:
+    http://yoctoproject.org/documentation
+
+For more information about OpenEmbedded see their website:
+    http://www.openembedded.org/
+
+
+### Shell environment set up for builds. ###
+
+You can now run 'bitbake <target>'
+
+Common targets are:
+    core-image-minimal
+    core-image-sato
+    meta-toolchain
+    meta-ide-support
+
+You can also run generated qemu images with a command like 'runqemu qemux86'
+
+
+
+
+
+2.3 Calling new target machine ' jgqemux86v1' and will invoke 'yocto-bsp create' 
+
+This will create our BSP layer in meta-jgqemux86v1 in the current directory with the inline options:
+
+$ yocto-bsp create jgqemux86v1 qemu
+Checking basic git connectivity...
+Done.
+
+Which qemu architecture would you like to use? [default: i386]
+	1) i386    (32-bit)
+	2) x86_64  (64-bit)
+	3) ARM     (32-bit)
+	4) PowerPC (32-bit)
+	5) MIPS    (32-bit)
+	6) MIPS64  (64-bit)
+1
+Would you like to use the default (4.4) kernel? (y/n) [default: y] 
+Do you need a new machine branch for this BSP (the alternative is to re-use an existing branch)? [y/n] [default: y] n
+Getting branches from remote repo git://git.yoctoproject.org/linux-yocto-4.4.git...
+Please choose a machine branch to base this BSP on: [default: standard/base]
+	1) standard/arm-versatile-926ejs
+	2) standard/base
+	3) standard/beaglebone
+	4) standard/edgerouter
+	5) standard/fsl-mpc8315e-rdb
+	6) standard/mti-malta32
+	7) standard/mti-malta64
+	8) standard/preempt-rt
+	9) standard/qemuarm64
+	10) standard/qemuppc
+
+Would you like SMP support? (y/n) [default: y] 
+Does your BSP have a touchscreen? (y/n) [default: n] 
+Does your BSP have a keyboard? (y/n) [default: y] 
+
+New qemu BSP created in meta-jgqemux86v1
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Mon May 16 23:41:29]
+
+
+$ ls -al
+total 2280
+drwxrwxr-x  10 sam1 sam1    4096 May 16 23:38 .
+drwxrwxr-x  13 sam1 sam1    4096 May 14 21:51 ..
+-rw-rw-r--   1 sam1 sam1       0 May 16 23:38 bitbake.lock
+drwxrwxr-x   2 sam1 sam1    4096 May 16 23:38 cache
+drwxrwxr-x   2 sam1 sam1    4096 May 16 12:41 conf
+drwxrwxr-x   4 sam1 sam1   49152 May 16 22:24 downloads
+drwxrwxr-x   2 sam1 sam1    4096 May 16 23:32 meta-jgqemui386
+drwxrwxr-x   8 sam1 sam1    4096 May 16 23:41 meta-jgqemux86v1
+-rw-rw-r--   1 sam1 sam1 2234083 May 15 03:44 output12
+-rw-rw-r--   1 sam1 sam1    2498 May 16 23:25 output13
+drwxrwxr-x 259 sam1 sam1    4096 May 14 23:57 sstate-cache
+drwxrwxr-x  12 sam1 sam1    4096 May 15 02:32 tmp
+drwxrwxr-x   6 sam1 sam1    4096 May 16 12:43 workspace
+
+
+2.4 Add the new Consul BSP layer to BBLAYERS
+
+In the BBLAYERS, in ignorecase/conf/bblayers.conf, to build or use the other Yocto BSP tools :
+
+$ cat ignorecase/conf/bblayers.conf
+# POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+# changes incompatibly
+POKY_BBLAYERS_CONF_VERSION = "2"
+
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+  /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta \
+  /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta-poky \
+  /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta-yocto-bsp \
+  /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace \
+  /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/meta-jgqemux86v1 \
+  "
+
+
+
+
+
+
+
+
+2.5 Inline modified layer configuration: conf/local.conf : 
+
+The modified lines are marked as hightlighted and bold inline:
+
+MACHINE ??= "jgqemux86v1"
+PACKAGE_CLASSES ?= "package_deb"
+EXTRA_IMAGE_FEATURES ?= "debug-tweaks"
+IMAGE_INSTALL_append = " consul064386binv1"
+
+
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  0:04:23]
+
+$ cat conf/local.conf 
+#
+# This file is your local configuration file and is where all local user settings
+# are placed. The comments in this file give some guide to the options a new user
+# to the system might want to change but pretty much any configuration option can
+# be set in this file. More adventurous users can look at local.conf.extended
+# which contains other examples of configuration which can be placed in this file
+# but new users likely won't need any of them initially.
+#
+# Lines starting with the '#' character are commented out and in some cases the
+# default values are provided as comments to show people example syntax. Enabling
+# the option is a question of removing the # character and making any change to the
+# variable as required.
+
+#
+# Machine Selection
+#
+# You need to select a specific machine to target the build with. There are a selection
+# of emulated machines available which can boot and run in the QEMU emulator:
+#
+#MACHINE ?= "qemuarm"
+#MACHINE ?= "qemuarm64"
+#MACHINE ?= "qemumips"
+#MACHINE ?= "qemumips64"
+#MACHINE ?= "qemuppc"
+#MACHINE ?= "qemux86"
+#MACHINE ?= "qemux86-64"
+#
+# There are also the following hardware board target machines included for 
+# demonstration purposes:
+#
+#MACHINE ?= "beaglebone"
+#MACHINE ?= "genericx86"
+#MACHINE ?= "genericx86-64"
+#MACHINE ?= "mpc8315e-rdb"
+#MACHINE ?= "edgerouter"
+#
+# This sets the default machine to be qemux86 if no other machine is selected:
+#default
+#MACHINE ??= "qemux86"
+#for custom qemu build
+MACHINE ??= "jgqemux86v1"
+
+#
+# Where to place downloads
+#
+# During a first build the system will download many different source code tarballs
+# from various upstream projects. This can take a while, particularly if your network
+# connection is slow. These are all stored in DL_DIR. When wiping and rebuilding you
+# can preserve this directory to speed up this part of subsequent builds. This directory
+# is safe to share between multiple builds on the same machine too.
+#
+# The default is a downloads directory under TOPDIR which is the build directory.
+#
+#DL_DIR ?= "${TOPDIR}/downloads"
+
+#
+# Where to place shared-state files
+#
+# BitBake has the capability to accelerate builds based on previously built output.
+# This is done using "shared state" files which can be thought of as cache objects
+# and this option determines where those files are placed.
+#
+# You can wipe out TMPDIR leaving this directory intact and the build would regenerate
+# from these files if no changes were made to the configuration. If changes were made
+# to the configuration, only shared state files where the state was still valid would
+# be used (done using checksums).
+#
+# The default is a sstate-cache directory under TOPDIR.
+#
+#SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
+
+#
+# Where to place the build output
+#
+# This option specifies where the bulk of the building work should be done and
+# where BitBake should place its temporary files and output. Keep in mind that
+# this includes the extraction and compilation of many applications and the toolchain
+# which can use Gigabytes of hard disk space.
+#
+# The default is a tmp directory under TOPDIR.
+#
+#TMPDIR = "${TOPDIR}/tmp"
+
+#
+# Default policy config
+#
+# The distribution setting controls which policy settings are used as defaults.
+# The default value is fine for general Yocto project use, at least initially.
+# Ultimately when creating custom policy, people will likely end up subclassing 
+# these defaults.
+#
+DISTRO ?= "poky"
+# As an example of a subclass there is a "bleeding" edge policy configuration
+# where many versions are set to the absolute latest code from the upstream 
+# source control systems. This is just mentioned here as an example, its not
+# useful to most new users.
+# DISTRO ?= "poky-bleeding"
+
+#
+# Package Management configuration
+#
+# This variable lists which packaging formats to enable. Multiple package backends
+# can be enabled at once and the first item listed in the variable will be used
+# to generate the root filesystems.
+# Options are:
+#  - 'package_deb' for debian style deb files
+#  - 'package_ipk' for ipk files are used by opkg (a debian style embedded package manager)
+#  - 'package_rpm' for rpm style packages
+# E.g.: PACKAGE_CLASSES ?= "package_rpm package_deb package_ipk"
+# We default to rpm:
+#PACKAGE_CLASSES ?= "package_rpm package_deb package_ipk"
+PACKAGE_CLASSES ?= "package_deb"
+
+#
+# SDK target architecture
+#
+# This variable specifies the architecture to build SDK items for and means
+# you can build the SDK packages for architectures other than the machine you are
+# running the build on (i.e. building i686 packages on an x86_64 host).
+# Supported values are i686 and x86_64
+#SDKMACHINE ?= "i686"
+
+#
+# Extra image configuration defaults
+#
+# The EXTRA_IMAGE_FEATURES variable allows extra packages to be added to the generated
+# images. Some of these options are added to certain image types automatically. The
+# variable can contain the following options:
+#  "dbg-pkgs"       - add -dbg packages for all installed packages
+#                     (adds symbol information for debugging/profiling)
+#  "dev-pkgs"       - add -dev packages for all installed packages
+#                     (useful if you want to develop against libs in the image)
+#  "ptest-pkgs"     - add -ptest packages for all ptest-enabled packages
+#                     (useful if you want to run the package test suites)
+#  "tools-sdk"      - add development tools (gcc, make, pkgconfig etc.)
+#  "tools-debug"    - add debugging tools (gdb, strace)
+#  "eclipse-debug"  - add Eclipse remote debugging support
+#  "tools-profile"  - add profiling tools (oprofile, lttng, valgrind)
+#  "tools-testapps" - add useful testing tools (ts_print, aplay, arecord etc.)
+#  "debug-tweaks"   - make an image suitable for development
+#                     e.g. ssh root access has a blank password
+# There are other application targets that can be used here too, see
+# meta/classes/image.bbclass and meta/classes/core-image.bbclass for more details.
+# We default to enabling the debugging tweaks.
+EXTRA_IMAGE_FEATURES ?= "debug-tweaks"
+
+#
+# Additional image features
+#
+# The following is a list of additional classes to use when building images which
+# enable extra features. Some available options which can be included in this variable
+# are:
+#   - 'buildstats' collect build statistics
+#   - 'image-mklibs' to reduce shared library files size for an image
+#   - 'image-prelink' in order to prelink the filesystem image
+#   - 'image-swab' to perform host system intrusion detection
+# NOTE: if listing mklibs & prelink both, then make sure mklibs is before prelink
+# NOTE: mklibs also needs to be explicitly enabled for a given image, see local.conf.extended
+# image-prelink disabled for now due to issues with IFUNC symbol relocation
+USER_CLASSES ?= "buildstats image-mklibs"
+
+#
+# Runtime testing of images
+#
+# The build system can test booting virtual machine images under qemu (an emulator)
+# after any root filesystems are created and run tests against those images. To
+# enable this uncomment this line. See classes/testimage(-auto).bbclass for
+# further details.
+#TEST_IMAGE = "1"
+#
+# Interactive shell configuration
+#
+# Under certain circumstances the system may need input from you and to do this it
+# can launch an interactive shell. It needs to do this since the build is
+# multithreaded and needs to be able to handle the case where more than one parallel
+# process may require the user's attention. The default is iterate over the available
+# terminal types to find one that works.
+#
+# Examples of the occasions this may happen are when resolving patches which cannot
+# be applied, to use the devshell or the kernel menuconfig
+#
+# Supported values are auto, gnome, xfce, rxvt, screen, konsole (KDE 3.x only), none
+# Note: currently, Konsole support only works for KDE 3.x due to the way
+# newer Konsole versions behave
+#OE_TERMINAL = "auto"
+# By default disable interactive patch resolution (tasks will just fail instead):
+PATCHRESOLVE = "noop"
+
+#
+# Disk Space Monitoring during the build
+#
+# Monitor the disk space during the build. If there is less that 1GB of space or less
+# than 100K inodes in any key build location (TMPDIR, DL_DIR, SSTATE_DIR), gracefully
+# shutdown the build. If there is less that 100MB or 1K inodes, perform a hard abort
+# of the build. The reason for this is that running completely out of space can corrupt
+# files and damages the build in ways which may not be easily recoverable.
+# It's necesary to monitor /tmp, if there is no space left the build will fail
+# with very exotic errors.
+BB_DISKMON_DIRS = "\
+    STOPTASKS,${TMPDIR},1G,100K \
+    STOPTASKS,${DL_DIR},1G,100K \
+    STOPTASKS,${SSTATE_DIR},1G,100K \
+    STOPTASKS,/tmp,100M,100K \
+    ABORT,${TMPDIR},100M,1K \
+    ABORT,${DL_DIR},100M,1K \
+    ABORT,${SSTATE_DIR},100M,1K \
+    ABORT,/tmp,10M,1K"
+
+#
+# Shared-state files from other locations
+#
+# As mentioned above, shared state files are prebuilt cache data objects which can
+# used to accelerate build time. This variable can be used to configure the system
+# to search other mirror locations for these objects before it builds the data itself.
+#
+# This can be a filesystem directory, or a remote url such as http or ftp. These
+# would contain the sstate-cache results from previous builds (possibly from other
+# machines). This variable works like fetcher MIRRORS/PREMIRRORS and points to the
+# cache locations to check for the shared objects.
+# NOTE: if the mirror uses the same structure as SSTATE_DIR, you need to add PATH
+# at the end as shown in the examples below. This will be substituted with the
+# correct path within the directory structure.
+#SSTATE_MIRRORS ?= "\
+#file://.* http://someserver.tld/share/sstate/PATH;downloadfilename=PATH \n \
+#file://.* file:///some/local/dir/sstate/PATH"
+
+
+#
+# Qemu configuration
+#
+# By default qemu will build with a builtin VNC server where graphical output can be
+# seen. The two lines below enable the SDL backend too. By default libsdl-native will
+# be built, if you want to use your host's libSDL instead of the minimal libsdl built
+# by libsdl-native then uncomment the ASSUME_PROVIDED line below.
+PACKAGECONFIG_append_pn-qemu-native = " sdl"
+PACKAGECONFIG_append_pn-nativesdk-qemu = " sdl"
+#ASSUME_PROVIDED += "libsdl-native"
+
+# CONF_VERSION is increased each time build/conf/ changes incompatibly and is used to
+# track the version of this file when it was generated. This can safely be ignored if
+# this doesn't mean anything to you.
+CONF_VERSION = "1"
+INHERIT += "rm_work"
+IMAGE_INSTALL_append = " consul064386binv1"
+
+
+2.5 Using meta/recipes-sato/images/core-image-sato.bb for new image building:
+
+$ cat meta/recipes-sato/images/core-image-sato.bb
+DESCRIPTION = "Image with Sato, a mobile environment and visual style for \
+mobile devices. The image supports X11 with a Sato theme, Pimlico \
+applications, and contains terminal, editor, and file manager."
+
+IMAGE_FEATURES += "splash x11-base x11-sato ssh-server-dropbear hwcodecs"
+
+LICENSE = "MIT"
+
+inherit core-image
+
+IMAGE_INSTALL += "consul064386binv1 packagegroup-core-x11-sato-games"
+
+
+2.6 Building the new image jgqemux86v1 with recipe consul064386binv1:
+
+$ bitbake core-image-sato 2>&1 | tee output15
+Parsing recipes...done.
+Parsing of 872 .bb files complete (0 cached, 872 parsed). 1302 targets, 48 skipped, 0 masked, 0 errors.
+NOTE: Resolving any missing task queue dependencies
+
+Build Configuration:
+BB_VERSION        = "1.30.0"
+BUILD_SYS         = "x86_64-linux"
+NATIVELSBSTRING   = "universal"
+TARGET_SYS        = "i586-poky-linux"
+MACHINE           = "jgqemux86v1"
+DISTRO            = "poky"
+DISTRO_VERSION    = "2.1"
+TUNE_FEATURES     = "m32 i586"
+TARGET_FPU        = ""
+meta              
+meta-poky         
+meta-yocto-bsp    
+workspace         
+meta-jgqemux86v1  = "krogoth:75ca53211488a3e268037a44ee2a7ac5c7181bd2"
+
+NOTE: Preparing RunQueue
+NOTE: Executing SetScene Tasks
+NOTE: Running setscene task 1741 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-kernel/linux/linux-yocto_4.4.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1743 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/packagegroups/packagegroup-core-boot.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1744 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/packagegroups/packagegroup-base.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1745 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/packagegroups/packagegroup-core-x11-sato.bb, do_package_write_deb_setscene)
+NOTE: recipe packagegroup-core-boot-1.0-r17: task do_package_write_deb_setscene: Started
+NOTE: recipe linux-yocto-4.4.3+gitAUTOINC+d6ee402d46_578ff2a886-r0.1: task do_package_write_deb_setscene: Started
+NOTE: recipe packagegroup-base-1.0-r83: task do_package_write_deb_setscene: Started
+NOTE: recipe packagegroup-core-x11-sato-1.0-r33: task do_package_write_deb_setscene: Started
+NOTE: recipe packagegroup-core-boot-1.0-r17: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1761 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/base-files/base-files_3.0.14.bb, do_package_write_deb_setscene)
+NOTE: recipe packagegroup-core-x11-sato-1.0-r33: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe packagegroup-base-1.0-r83: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe linux-yocto-4.4.3+gitAUTOINC+d6ee402d46_578ff2a886-r0.1: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1766 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/busybox/busybox_1.24.1.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1768 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/init-ifupdown/init-ifupdown_1.0.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1788 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/matchbox-sato/matchbox-session-sato_0.1.bb, do_package_write_deb_setscene)
+NOTE: recipe base-files-3.0.14-r89: task do_package_write_deb_setscene: Started
+NOTE: recipe init-ifupdown-1.0-r7: task do_package_write_deb_setscene: Started
+NOTE: recipe matchbox-session-sato-0.1-r30: task do_package_write_deb_setscene: Started
+NOTE: recipe base-files-3.0.14-r89: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe init-ifupdown-1.0-r7: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1804 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-multimedia/gstreamer/gst-player_git.bb, do_package_write_deb_setscene)
+NOTE: recipe busybox-1.24.1-r0: task do_package_write_deb_setscene: Started
+NOTE: recipe matchbox-session-sato-0.1-r30: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1809 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-graphics/packagegroups/packagegroup-core-x11-xserver.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1812 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-bsp/pointercal/pointercal_0.0.bb, do_package_write_deb_setscene)
+NOTE: recipe busybox-1.24.1-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe pointercal-0.0-r11: task do_package_write_deb_setscene: Started
+NOTE: recipe packagegroup-core-x11-xserver-1.0-r40: task do_package_write_deb_setscene: Started
+NOTE: recipe gst-player-git-r0: task do_package_write_deb_setscene: Started
+NOTE: Running setscene task 1872 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-multimedia/gstreamer/gstreamer1.0_1.6.3.bb, do_package_write_deb_setscene)
+NOTE: recipe pointercal-0.0-r11: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe packagegroup-core-x11-xserver-1.0-r40: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1875 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-multimedia/gstreamer/gstreamer1.0-plugins-base_1.6.3.bb, do_package_write_deb_setscene)
+NOTE: recipe gst-player-git-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1885 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-core/sysvinit/sysvinit-inittab_2.88dsf.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1890 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-bsp/formfactor/formfactor_0.0.bb, do_package_write_deb_setscene)
+NOTE: recipe gstreamer1.0-1.6.3-r0: task do_package_write_deb_setscene: Started
+NOTE: recipe sysvinit-inittab-2.88dsf-r10: task do_package_write_deb_setscene: Started
+NOTE: recipe gstreamer1.0-plugins-base-1.6.3-r0: task do_package_write_deb_setscene: Started
+NOTE: recipe formfactor-0.0-r45: task do_package_write_deb_setscene: Started
+NOTE: recipe sysvinit-inittab-2.88dsf-r10: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe gstreamer1.0-1.6.3-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1900 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-multimedia/gstreamer/gstreamer1.0-plugins-good_1.6.3.bb, do_package_write_deb_setscene)
+NOTE: Running setscene task 1901 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-multimedia/gstreamer/gstreamer1.0-plugins-bad_1.6.3.bb, do_package_write_deb_setscene)
+NOTE: recipe formfactor-0.0-r45: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1910 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-graphics/x11-common/xserver-nodm-init.bb, do_package_write_deb_setscene)
+NOTE: recipe gstreamer1.0-plugins-base-1.6.3-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 1924 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-extended/shadow/shadow-securetty_4.2.1.bb, do_package_write_deb_setscene)
+NOTE: recipe gstreamer1.0-plugins-bad-1.6.3-r0: task do_package_write_deb_setscene: Started
+NOTE: recipe xserver-nodm-init-1.0-r31: task do_package_write_deb_setscene: Started
+NOTE: recipe gstreamer1.0-plugins-good-1.6.3-r0: task do_package_write_deb_setscene: Started
+NOTE: recipe shadow-securetty-4.2.1-r3: task do_package_write_deb_setscene: Started
+NOTE: recipe xserver-nodm-init-1.0-r31: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe shadow-securetty-4.2.1-r3: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe gstreamer1.0-plugins-good-1.6.3-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 2022 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-connectivity/connman/connman-conf.bb, do_package_write_deb_setscene)
+NOTE: recipe gstreamer1.0-plugins-bad-1.6.3-r0: task do_package_write_deb_setscene: Succeeded
+NOTE: Running setscene task 2026 of 2054 (/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-graphics/xorg-xserver/xserver-xf86-config_0.1.bb, do_package_write_deb_setscene)
+NOTE: recipe xserver-xf86-config-0.1-r33: task do_package_write_deb_setscene: Started
+NOTE: recipe connman-conf-1.0-r2: task do_package_write_deb_setscene: Started
+NOTE: recipe xserver-xf86-config-0.1-r33: task do_package_write_deb_setscene: Succeeded
+NOTE: recipe connman-conf-1.0-r2: task do_package_write_deb_setscene: Succeeded
+NOTE: Executing RunQueue Tasks
+NOTE: Running task 5563 of 5657 (ID: 244, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_packagedata)
+NOTE: Running task 5565 of 5657 (ID: 240, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_populate_sysroot)
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_packagedata: Started
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_populate_sysroot: Started
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_packagedata: Succeeded
+NOTE: Running task 5646 of 5657 (ID: 249, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_package_write_deb)
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_populate_sysroot: Succeeded
+NOTE: Running task 5647 of 5657 (ID: 245, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_package_qa)
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_package_write_deb: Started
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_package_qa: Started
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_package_qa: Succeeded
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_package_write_deb: Succeeded
+NOTE: Running task 5648 of 5657 (ID: 9, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_rootfs)
+NOTE: Running noexec task 5649 of 5657 (ID: 246, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_build)
+NOTE: Running task 5650 of 5657 (ID: 247, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/workspace/recipes/consul064386binv1/consul064386binv1_0.6.4.bb, do_rm_work)
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_rm_work: Started
+NOTE: recipe consul064386binv1-0.6.4-r0: task do_rm_work: Succeeded
+NOTE: recipe core-image-sato-1.0-r0: task do_rootfs: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_rootfs: Succeeded
+NOTE: Running task 5651 of 5657 (ID: 8, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_image)
+NOTE: recipe core-image-sato-1.0-r0: task do_image: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_image: Succeeded
+NOTE: Running task 5652 of 5657 (ID: 19, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_image_ext4)
+NOTE: Running task 5653 of 5657 (ID: 18, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_image_tar)
+NOTE: recipe core-image-sato-1.0-r0: task do_image_ext4: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_image_tar: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_image_ext4: Succeeded
+NOTE: recipe core-image-sato-1.0-r0: task do_image_tar: Succeeded
+NOTE: Running task 5654 of 5657 (ID: 7, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_image_complete)
+NOTE: recipe core-image-sato-1.0-r0: task do_image_complete: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_image_complete: Succeeded
+NOTE: Running noexec task 5655 of 5657 (ID: 13, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_build)
+NOTE: Running task 5656 of 5657 (ID: 14, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_rm_work)
+NOTE: recipe core-image-sato-1.0-r0: task do_rm_work: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_rm_work: Succeeded
+NOTE: Running task 5657 of 5657 (ID: 15, /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/meta/recipes-sato/images/core-image-sato.bb, do_rm_work_all)
+NOTE: recipe core-image-sato-1.0-r0: task do_rm_work_all: Started
+NOTE: recipe core-image-sato-1.0-r0: task do_rm_work_all: Succeeded
+NOTE: Tasks Summary: Attempted 5657 tasks of which 5643 didn't need to be rerun and all succeeded.
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  3:56:39]
+$ locate sanity.conf^C
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  3:57:57]
+$ ll tmp/deploy/images/jgqemux86v1/bzImage-jgqemux86v1.bin
+lrwxrwxrwx 1 sam1 sam1 77 May 17 00:28 tmp/deploy/images/jgqemux86v1/bzImage-jgqemux86v1.bin -> bzImage--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.bin
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  3:57:59]
+$ runqemu qemux86 ^C
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  3:58:44]
+
+
+2.7 Verified the newly build kernel and rootfs image:
+
+
+$ ll tmp/deploy/images/jgqemux86v1/
+total 356524
+-rw-r--r-- 1 sam1 sam1   4749120 May 17 00:28 bzImage--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.bin
+-rw-rw-r-- 1 sam1 sam1   1661441 May 17 00:28 modules--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.tgz
+drwxrwxr-x 4 sam1 sam1      4096 May 17 00:28 ..
+lrwxrwxrwx 1 sam1 sam1        77 May 17 00:28 modules-jgqemux86v1.tgz -> modules--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.tgz
+lrwxrwxrwx 1 sam1 sam1        77 May 17 00:28 bzImage-jgqemux86v1.bin -> bzImage--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.bin
+lrwxrwxrwx 1 sam1 sam1        77 May 17 00:28 bzImage -> bzImage--4.4.3+git0+d6ee402d46_578ff2a886-r0.1-jgqemux86v1-20160516183704.bin
+-rw-r--r-- 1 sam1 sam1     20295 May 17 00:31 core-image-sato-jgqemux86v1-20160516183704.rootfs.manifest
+-rw-r--r-- 1 sam1 sam1  43967433 May 17 00:31 core-image-sato-jgqemux86v1-20160516183704.rootfs.tar.bz2
+-rw-r--r-- 1 sam1 sam1 180766720 May 17 02:46 core-image-sato-jgqemux86v1-20160516183704.rootfs.ext4
+-rw-r--r-- 1 sam1 sam1       294 May 17 03:54 README_-_DO_NOT_DELETE_FILES_IN_THIS_DIRECTORY.txt
+-rw-r--r-- 1 sam1 sam1     20327 May 17 03:56 core-image-sato-jgqemux86v1-20160516222414.rootfs.manifest
+lrwxrwxrwx 1 sam1 sam1        58 May 17 03:56 core-image-sato-jgqemux86v1.manifest -> core-image-sato-jgqemux86v1-20160516222414.rootfs.manifest
+-rw-r--r-- 1 sam1 sam1  47840931 May 17 03:56 core-image-sato-jgqemux86v1-20160516222414.rootfs.tar.bz2
+-rw-r--r-- 1 sam1 sam1 196794368 May 17 03:56 core-image-sato-jgqemux86v1-20160516222414.rootfs.ext4
+lrwxrwxrwx 1 sam1 sam1        54 May 17 03:56 core-image-sato-jgqemux86v1.ext4 -> core-image-sato-jgqemux86v1-20160516222414.rootfs.ext4
+lrwxrwxrwx 1 sam1 sam1        57 May 17 03:56 core-image-sato-jgqemux86v1.tar.bz2 -> core-image-sato-jgqemux86v1-20160516222414.rootfs.tar.bz2
+drwxrwxr-x 2 sam1 sam1      4096 May 17 03:56 .
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase [Tue May 17  3:58:48]
+
+
+
+2.8 Tree structure post new image build completion before deployment:
+
+$ tree /home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/meta-jgqemux86v1
+/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/meta-jgqemux86v1
+|-- binary
+|-- conf
+|   |-- layer.conf
+|   `-- machine
+|       `-- jgqemux86v1.conf
+|-- COPYING.MIT
+|-- README
+|-- README.sources
+|-- recipes-bsp
+|   `-- formfactor
+|       |-- formfactor
+|       |   `-- jgqemux86v1
+|       |       `-- machconfig
+|       `-- formfactor_0.0.bbappend
+|-- recipes-core
+|   `-- init-ifupdown
+|       |-- init-ifupdown
+|       |   `-- jgqemux86v1
+|       |       `-- interfaces
+|       `-- init-ifupdown_1.0.bbappend
+|-- recipes-graphics
+|   `-- xorg-xserver
+|       |-- xserver-xf86-config
+|       |   `-- jgqemux86v1
+|       |       `-- xorg.conf
+|       `-- xserver-xf86-config_0.1.bbappend
+`-- recipes-kernel
+    `-- linux
+        |-- files
+        |   |-- jgqemux86v1.cfg
+        |   |-- jgqemux86v1-preempt-rt.scc
+        |   |-- jgqemux86v1.scc
+        |   |-- jgqemux86v1-standard.scc
+        |   |-- jgqemux86v1-tiny.scc
+        |   |-- jgqemux86v1-user-config.cfg
+        |   |-- jgqemux86v1-user-features.scc
+        |   `-- jgqemux86v1-user-patches.scc
+        `-- linux-yocto_4.4.bbappend
+
+18 directories, 20 files
+
+
+
+$ tree workspace/recipes/consul064386binv1 workspace/appends workspace/conf workspace/sources/consul0646binv1
+workspace/recipes/consul064386binv1
+`-- consul064386binv1_0.6.4.bb
+workspace/appends
+`-- consul064386binv1_0.6.4.bbappend
+workspace/conf
+`-- layer.conf
+workspace/sources/consul064386binv1
+`-- consul
+
+0 directories, 4 files
+
+
+
+$ find * -name jgqemux86v1
+ignorecase/tmp/deploy/deb/jgqemux86v1
+ignorecase/tmp/deploy/images/jgqemux86v1
+ignorecase/tmp/log/cooker/jgqemux86v1
+ignorecase/tmp/cache/default-glibc/jgqemux86v1
+ignorecase/tmp/work-shared/jgqemux86v1
+ignorecase/tmp/work-shared/jgqemux86v1/kernel-source/.kernel-meta/cfg/jgqemux86v1
+ignorecase/tmp/sysroots/jgqemux86v1
+ignorecase/meta-jgqemux86v1/recipes-graphics/xorg-xserver/xserver-xf86-config/jgqemux86v1
+ignorecase/meta-jgqemux86v1/recipes-bsp/formfactor/formfactor/jgqemux86v1
+ignorecase/meta-jgqemux86v1/recipes-core/init-ifupdown/init-ifupdown/jgqemux86v1
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Tue May 17  2:59:02]
+$ find * -name ignorecase/tmp/cache/default-glibc/jgqemux86v1
+find: warning: Unix filenames usually don't contain slashes (though pathnames do).  That means that '-name `ignorecase/tmp/cache/default-glibc/jgqemux86v1'' will probably evaluate to false all the time on this system.  You might find the '-wholename' test more useful, or perhaps '-samefile'.  Alternatively, if you are using GNU grep, you could use 'find ... -print0 | grep -FzZ `ignorecase/tmp/cache/default-glibc/jgqemux86v1''.
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Tue May 17  3:00:36]
+
+2.9 Running the new image jgqemux86v1 with new kernel and rootfs:
+
+
+$ runqemu qemux86 tmp/deploy/images/jgqemux86v1/bzImage-jgqemux86v1.bin tmp/deploy/images/jgqemux86v1/core-image-sato-jgqemux86v1.ext4
+
+Continuing with the following parameters:
+KERNEL: [tmp/deploy/images/jgqemux86v1/bzImage-jgqemux86v1.bin]
+ROOTFS: [/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/jgqemux86v1/core-image-sato-jgqemux86v1-20160516183704.rootfs.ext4]
+FSTYPE: [ext4]
+Setting up tap interface under sudo
+Acquiring lockfile for tap0...
+Running qemu-system-i386...
+/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/sysroots/x86_64-linux/usr/bin/qemu-system-i386 -kernel tmp/deploy/images/jgqemux86v1/bzImage-jgqemux86v1.bin -net nic,model=virtio -net tap,vlan=0,ifname=tap0,script=no,downscript=no -cpu qemu32 -drive file=/home/sam1/pers/test_proj1/yocto/poky/krogoth2.1/poky/ignorecase/tmp/deploy/images/jgqemux86v1/core-image-sato-jgqemux86v1-20160516183704.rootfs.ext4,if=virtio,format=raw -show-cursor -usb -usbdevice tablet -vga vmware -no-reboot -m 256 -serial mon:vc -serial null -append "vga=0 uvesafb.mode_option=640x480-32 root=/dev/vda rw mem=256M ip=192.168.7.2::192.168.7.1:255.255.255.0 oprofile.timer=1 rootfstype=ext4 "
+
+...
+...
+
+
+
+
+ 
+
+
+
+
+
+Set 'tap0' nonpersistent
+Releasing lockfile of preconfigured tap device 'tap0'
+
+
+
+
+
+2.10 Verified the source  consul-i386 source binary and destination target: 
+
+jgqemux86v1 binary for integrity and shared the details:
+
+
+$ ll ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/package/consul 
+-rwxr-xr-x 2 sam1 sam1 12323060 May 16 19:57 ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/package/consul
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Tue May 17  4:20:38]
+$ md5sum ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/packages-split/consul064386binv1/consul
+c609e18b95727cf7040acbd7de417a7f  ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/packages-split/consul064386binv1/consul
+sam1@samlp1 192.168.2.3 ~/pers/test_proj1/yocto/poky/krogoth2.1/poky [Tue May 17  4:20:43]
+$ du -sh ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/package/consul
+12M	ignorecase/tmp/work/i586-poky-linux/consul064386binv1/0.6.4-r0/package/consul
+12M	total
+ 
+
+
+
+
+
+
+
+
+KINDLY SHARE FEEDBACKS AND SUGGESTIONS OF THE ABOVE CONTENTS.
+
+Page 1 of 26
+
+
